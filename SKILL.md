@@ -1,23 +1,6 @@
 ---
 name: jobtread
 description: Query and mutate JobTread (construction management platform) data via the Pave JSON graph API. Bundles a Node.js CLI (jt.ts) for execution and a complete API guide for raw HTTP access. Use this whenever the user asks about JobTread — jobs, documents, invoices, payments, accounts, tasks, time entries, daily logs, cost items, webhooks, or tutorials.
-argument-hint: "[natural-language request about JobTread data]"
-allowed-tools:
-  - read
-  - grep
-  - glob
-  - exec
-  - webfetch
-permissions:
-  allow:
-    - Exec(npx tsx jt.ts *)
-    - Exec(npx tsx scripts/jt.ts *)
-    - Exec(node scripts/jt.ts *)
-    - Exec(curl https://api.jobtread.com/pave *)
-    - Read(**)
-triggers:
-  - user
-  - model
 ---
 
 # JobTread Skill
