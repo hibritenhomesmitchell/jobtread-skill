@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Typecheck
-        run: npx tsc -p tsconfig.json
+        run: npm run typecheck
 
       - name: Run unit tests
         # Integration tests auto-skip without JT_GRANT_KEY.

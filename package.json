@@ -12,7 +12,8 @@
         "test:unit": "vitest run --testNamePattern='^(?!Integration)'",
         "test:integration": "vitest run --testNamePattern='Integration'",
         "build:zip": "node build.mjs",
-        "clean": "node build.mjs --clean"
+        "clean": "node build.mjs --clean",
+        "typecheck": "tsc -p tsconfig.json"
     },
     "dependencies": {
         "tsx": "^4.19.0"
@@ -22,6 +23,7 @@
     },
     "devDependencies": {
         "@types/node": "^20.19.43",
+        "typescript": "^5.5.4",
         "vitest": "^2.1.9"
     }
 }
