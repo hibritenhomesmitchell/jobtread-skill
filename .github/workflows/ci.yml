@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck, test, and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -p tsconfig.json
+
+      - name: Run unit tests
+        # Integration tests auto-skip without JT_GRANT_KEY.
+        run: npm run test:unit
+
+      - name: Build zip
+        run: npm run build:zip
+
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum -c jobtread-skill.zip.sha256
+
+      - name: Verify zip is flat (SKILL.md at root)
+        run: |
+          set -e
+          LISTING=$(unzip -l dist/jobtread-skill.zip)
+          # SKILL.md must appear at the root (no leading directory).
+          if ! echo "$LISTING" | grep -Eq '^\s+\S+\s+\S+\s+\S+\s+SKILL.md$'; then
+            echo "FAIL: SKILL.md not found at zip root"
+            echo "$LISTING"
+            exit 1
+          fi
+          # No node_modules, no test/, no package-lock.json.
+          if echo "$LISTING" | grep -Eq 'node_modules/|test/|package-lock.json'; then
+            echo "FAIL: excluded content leaked into zip"
+            echo "$LISTING"
+            exit 1
+          fi
+          echo "OK: zip is flat and clean"
+
+      - name: Upload zip as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jobtread-skill-zip
+          path: |
+            dist/jobtread-skill.zip
+            dist/jobtread-skill.zip.sha256
+          retention-days: 14

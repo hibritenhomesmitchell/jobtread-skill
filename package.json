@@ -1,0 +1,27 @@
+{
+    "name": "jobtread-skill",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "A Devin/agents-standard skill folder for interacting with the JobTread Pave API. Bundles a Node.js CLI (scripts/jt.ts) and a complete API guide for raw HTTP access.",
+    "scripts": {
+        "jt": "tsx scripts/jt.ts",
+        "help": "tsx scripts/jt.ts --help",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:unit": "vitest run --testNamePattern='^(?!Integration)'",
+        "test:integration": "vitest run --testNamePattern='Integration'",
+        "build:zip": "node build.mjs",
+        "clean": "node build.mjs --clean"
+    },
+    "dependencies": {
+        "tsx": "^4.19.0"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "devDependencies": {
+        "@types/node": "^20.19.43",
+        "vitest": "^2.1.9"
+    }
+}

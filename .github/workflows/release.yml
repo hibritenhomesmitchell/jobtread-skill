@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  # Trigger on semver tags (v1.0.0, v1.0.0-rc.1, etc.)
+  push:
+    tags:
+      - 'v*'
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for the release (e.g. v1.0.0). Required for manual runs.'
+        required: true
+        type: string
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  build-and-release:
+    name: Build zip and create release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for changelog generation
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -p tsconfig.json
+
+      - name: Run unit tests
+        # Integration tests auto-skip without JT_GRANT_KEY.
+        run: npm run test:unit
+
+      - name: Build zip
+        id: build
+        run: |
+          npm run build:zip
+          # Expose paths and metadata to later steps.
+          echo "zip-path=dist/jobtread-skill.zip" >> "$GITHUB_OUTPUT"
+          echo "checksum-path=dist/jobtread-skill.zip.sha256" >> "$GITHUB_OUTPUT"
+          echo "zip-size=$(stat -c%s dist/jobtread-skill.zip)" >> "$GITHUB_OUTPUT"
+          # Read the checksum hex for the release notes.
+          echo "sha256=$(awk '{print $1}' dist/jobtread-skill.zip.sha256)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum -c jobtread-skill.zip.sha256
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # Strip leading 'v' for the version string used in the zip name.
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build versioned zip
+        run: |
+          # Rebuild with a versioned name so the download file is self-describing.
+          npm run build:zip -- --name=jobtread-skill-${{ steps.tag.outputs.version }}
+          # Also copy under the canonical name for the checksum step below.
+          cp dist/jobtread-skill-${{ steps.tag.outputs.version }}.zip dist/jobtread-skill.zip
+          (cd dist && sha256sum jobtread-skill-${{ steps.tag.outputs.version }}.zip > jobtread-skill-${{ steps.tag.outputs.version }}.zip.sha256)
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat > /tmp/release-notes.md <<EOF
+          ## JobTread Skill ${{ steps.tag.outputs.tag }}
+
+          **Download:** \`jobtread-skill-${{ steps.tag.outputs.version }}.zip\` (${{ steps.build.outputs.zip-size }} bytes)
+
+          **SHA-256:** \`${{ steps.build.outputs.sha256 }}\`
+
+          ### Install
+
+          Unzip into your agent's skills directory:
+
+          \`\`\`bash
+          # Devin CLI
+          unzip jobtread-skill-${{ steps.tag.outputs.version }}.zip -d ~/.config/devin/skills/jobtread
+
+          # Claude / .agents standard
+          unzip jobtread-skill-${{ steps.tag.outputs.version }}.zip -d .agents/skills/jobtread
+
+          # Cursor / Windsurf
+          unzip jobtread-skill-${{ steps.tag.outputs.version }}.zip -d .windsurf/skills/jobtread
+          \`\`\`
+
+          Then set your JobTread grant key (generate one at https://app.jobtread.com/grants):
+
+          \`\`\`bash
+          export JT_GRANT_KEY="<your grant key>"
+          \`\`\`
+
+          ### Verify the download
+
+          \`\`\`bash
+          sha256sum -c jobtread-skill-${{ steps.tag.outputs.version }}.zip.sha256
+          \`\`\`
+
+          ### What's inside
+
+          - \`SKILL.md\` — skill entry point (at the zip root)
+          - \`api-guide.md\` — raw HTTP guide (no scripts required)
+          - \`references/\` — 6 reference docs (Pave query language, schema, document types, etc.)
+          - \`workflows/\` — 5 step-by-step playbooks
+          - \`scripts/\` — \`jt.ts\` CLI dispatcher + \`pave-client.ts\`
+          - \`README.md\`, \`.env.example\`, \`.gitignore\`, \`package.json\`
+
+          Requires Node.js 20+ for the CLI scripts. The read-only / HTTP path needs nothing.
+          EOF
+          echo "path=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: JobTread Skill ${{ steps.tag.outputs.tag }}
+          body_path: /tmp/release-notes.md
+          files: |
+            dist/jobtread-skill-${{ steps.tag.outputs.version }}.zip
+            dist/jobtread-skill-${{ steps.tag.outputs.version }}.zip.sha256
+          fail_on_unmatched_files: true
+          generate_release_notes: true
